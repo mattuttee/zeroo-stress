@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#F7F4EA" />
+  <title>ZERO STRESS</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sand: '#F7F4EA', hemp: '#E2EAE3', sage: '#C8D6AF', warm: '#EFE6D5',
+            peach: '#F5C2A0', ink: '#4A4339', muted: '#8C8273'
+          },
+          fontFamily: {
+            body: ['Nunito', 'system-ui', 'sans-serif'],
+            serif: ['Fraunces', 'Georgia', 'serif']
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Fraunces:ital,wght@0,600;1,500&display=swap" rel="stylesheet" />
+
+  <style>
+    html, body { background: #F7F4EA; color: #4A4339; -webkit-font-smoothing: antialiased; }
+    .soft-shadow { box-shadow: 0 8px 22px -12px rgba(74, 67, 57, .28), 0 1px 2px rgba(74, 67, 57, .06); }
+    .toast-enter { animation: toastIn .35s ease both; }
+    @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+    .wheel-wrap { position: relative; display: flex; justify-content: center; gap: 12px; }
+    .wheel-hl { position: absolute; left: 12px; right: 12px; top: 88px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.7); pointer-events: none; z-index: 0; }
+    .wheel { position: relative; z-index: 1; height: 220px; width: 96px; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+    .wheel::-webkit-scrollbar { display: none; }
+    .wheel-item { height: 44px; line-height: 44px; text-align: center; scroll-snap-align: center; font-size: 22px; color: #8C8273; font-variant-numeric: tabular-nums; }
+    .wheel-item.on { color: #4A4339; font-weight: 700; }
+
+    /* ---------- Tareas ---------- */
+    .task-card { overflow: hidden; }
+    .is-done { opacity: .55; }
+    .chk { opacity: 0; }
+    .is-done .chk { opacity: 1; }
+    .chk path { stroke-dasharray: 16; stroke-dashoffset: 0; }
+
+    .anim-check { animation: settle .35s ease backwards; }
+    .anim-check .chk path { animation: draw .3s ease .1s backwards; }
+    @keyframes settle { from { transform: scale(.985); } to { transform: none; } }
+    @keyframes draw { from { stroke-dashoffset: 16; } to { stroke-dashoffset: 0; } }
+
+    .anim-out-down { animation: outDown .4s cubic-bezier(.4, 0, .2, 1) forwards; }
+    @keyframes outDown { to { transform: translateY(28px); opacity: 0; } }
+
+    .anim-out-shrink { animation: shrink .35s ease forwards; }
+    @keyframes shrink {
+      from { max-height: 480px; }
+      to { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; }
+    }
+
+    .anim-pulse { animation: pulse .35s ease; }
+    @keyframes pulse { 50% { transform: scale(1.25); } }
+    .anim-rise { animation: rise .35s ease backwards; }
+    .anim-in { animation: rise .4s ease backwards; }
+    @keyframes rise { from { transform: translateY(10px); opacity: .5; } to { transform: none; opacity: 1; } }
+
+    .anim-glow { animation: glow .6s ease; }
+    @keyframes glow {
+      0% { outline: 2px solid transparent; outline-offset: 3px; }
+      40% { outline: 2px solid rgba(74, 67, 57, .28); outline-offset: 3px; }
+      100% { outline: 2px solid transparent; outline-offset: 3px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .anim-out-down, .anim-out-shrink { animation: fadeOut .2s ease forwards; }
+      .anim-check, .anim-check .chk path, .anim-pulse, .anim-rise, .anim-in, .anim-glow { animation: none; }
+      @keyframes fadeOut { to { opacity: 0; } }
+    }
+  </style>
+</head>
+
+<body class="font-body min-h-screen">
+
+  <div id="app"
+       class="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-sand
+              sm:my-6 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2.5rem] sm:border-[10px] sm:border-[#E9E2D0] sm:shadow-2xl">
+
+    <header class="relative px-6 pt-10 pb-4" style="padding-top: max(2.5rem, env(safe-area-inset-top));">
+      <p class="text-[11px] font-extrabold tracking-[0.35em] text-muted">ZERO STRESS</p>
+      <h1 class="font-serif text-3xl mt-2">Hoy, sin prisa.</h1>
+      <p id="date" class="mt-1 text-sm capitalize text-muted"></p>
+      <button id="open-config" class="absolute right-6 top-10 rounded-full border border-[#E6DFCD] bg-white/60 px-3.5 py-1.5 text-[12px] text-muted transition active:scale-95">⚙ Ajustes</button>
+    </header>
+
+    <div class="space-y-3 px-5">
+      <div id="aviso" class="hidden rounded-[1.5rem] bg-white/70 p-4 soft-shadow">
+        <p id="aviso-txt" class="text-[15px] leading-snug"></p>
+        <div class="mt-3 flex gap-2">
+          <button id="aviso-ok" class="flex-1 rounded-full py-2.5 text-[13px] font-bold text-ink transition active:scale-95" style="background:#F5C2A0">Listo, ya lo hago</button>
+          <button id="aviso-later" class="flex-1 rounded-full border border-[#E6DFCD] py-2.5 text-[13px] text-ink transition active:scale-95">En un rato</button>
+        </div>
+      </div>
+      <div id="pend" class="hidden"></div>
+    </div>
+
+    <main id="board" class="flex-1 space-y-4 px-5 pt-4 pb-6"></main>
+
+    <footer class="sticky bottom-0 z-20 px-4 pt-3 pb-5"
+            style="padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+                   background: linear-gradient(to top, #F7F4EA 65%, rgba(247,244,234,0));">
+      <form id="form" autocomplete="off"
+            class="flex items-center gap-2 rounded-full border border-[#E6DFCD] bg-white/70 py-2 pl-5 pr-2 backdrop-blur soft-shadow">
+        <input id="input" type="text" enterkeyhint="send"
+               placeholder="Dicta o escribe tu día sin orden..."
+               class="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted/80" />
+        <button type="button" id="mic" aria-label="Dictar por voz"
+                class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink transition active:scale-95"
+                style="background:#F5C2A0">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+            <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"></path>
+          </svg>
+        </button>
+        <button type="submit" id="send" aria-label="Enviar"
+                class="hidden h-11 w-11 shrink-0 place-items-center rounded-full text-ink transition active:scale-95"
+                style="background:#F5C2A0">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"></path>
+          </svg>
+        </button>
+      </form>
+    </footer>
+  </div>
+
+  <!-- Ajustes -->
+  <div id="config" class="fixed inset-0 z-40 hidden">
+    <div id="config-bg" class="absolute inset-0 bg-ink/35"></div>
+    <div class="absolute inset-x-0 bottom-0 mx-auto max-w-md max-h-[92vh] overflow-y-auto rounded-t-[2rem] bg-sand px-5 pt-5 pb-7 shadow-2xl"
+         style="padding-bottom: max(1.75rem, env(safe-area-inset-bottom));">
+      <div class="flex items-center justify-between">
+        <h2 class="font-serif text-2xl">Ajustes</h2>
+        <button id="config-close" aria-label="Cerrar" class="grid h-9 w-9 place-items-center rounded-full text-lg text-muted">×</button>
+      </div>
+
+      <p class="mt-4 text-[12px] font-bold tracking-[0.2em] text-muted">MIS HORARIOS</p>
+      <p class="mt-1 text-[13px] leading-relaxed text-muted">Las franjas se encadenan: al mover el fin de una, la siguiente empieza ahí.</p>
+      <div id="config-body" class="mt-3 space-y-3"></div>
+      <p id="config-error" class="hidden mt-3 rounded-2xl bg-white/60 px-4 py-3 text-[13px] leading-relaxed"></p>
+
+      <p class="mt-6 text-[12px] font-bold tracking-[0.2em] text-muted">AVISOS</p>
+      <div class="mt-3 rounded-[1.25rem] bg-white/50 p-4 text-[14px] leading-relaxed">
+        <p>Tareas con hora: aviso <span id="hf-min"></span> min antes.</p>
+        <p>Tareas sin hora: aviso 90 min antes del cierre de su franja.</p>
+        <button id="toggle-sonido" class="mt-3 rounded-full border border-[#E6DFCD] bg-white/60 px-4 py-2 text-[13px] transition active:scale-95"></button>
+      </div>
+
+      <p class="mt-6 text-[12px] font-bold tracking-[0.2em] text-muted">PRUEBA</p>
+      <div class="mt-3 rounded-[1.25rem] bg-white/50 p-4">
+        <p class="text-[13px] leading-relaxed text-muted">Lo que usas queda guardado solo en tu teléfono. Cópialo para compartirlo conmigo.</p>
+        <div class="mt-3 flex gap-2">
+          <button id="log-export" class="flex-1 rounded-full py-2.5 text-[13px] font-bold text-ink" style="background:#F5C2A0">Copiar datos</button>
+          <button id="log-clear" class="flex-1 rounded-full border border-[#E6DFCD] py-2.5 text-[13px] text-ink">Borrar datos</button>
+        </div>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <button id="config-reset" class="flex-1 rounded-full border border-[#E6DFCD] py-3 text-[14px] text-ink transition active:scale-95">Restablecer</button>
+        <button id="config-save" class="flex-1 rounded-full py-3 text-[14px] font-bold text-ink transition active:scale-95" style="background:#F5C2A0">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selector de hora -->
+  <div id="picker" class="fixed inset-0 z-50 hidden">
+    <div id="picker-bg" class="absolute inset-0 bg-ink/40"></div>
+    <div class="absolute inset-x-4 bottom-6 mx-auto max-w-md rounded-[2rem] bg-sand px-5 pt-5 pb-5 shadow-2xl">
+      <p id="picker-title" class="text-center font-serif text-xl"></p>
+      <div class="mt-3"><div id="wheel-wrap" class="wheel-wrap"><div class="wheel-hl"></div></div></div>
+      <div class="mt-4 flex gap-3">
+        <button id="picker-cancel" class="flex-1 rounded-full border border-[#E6DFCD] py-3 text-[14px] text-ink transition active:scale-95">Cancelar</button>
+        <button id="picker-ok" class="flex-1 rounded-full py-3 text-[14px] font-bold text-ink transition active:scale-95" style="background:#F5C2A0">Listo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed left-1/2 top-6 z-50 hidden -translate-x-1/2 rounded-full bg-ink/90 px-5 py-2.5 text-center text-[13px] text-sand soft-shadow max-w-[90%]"></div>
+
+<script>
+/* ==========================================================
+   ZERO STRESS — prototipo de pruebas
+   Modelo de datos v2 + animaciones + registro de uso local
+   ========================================================== */
+
+const KEYS = {
+  ajustes: 'zs_v2_ajustes',
+  tareas: 'zs_v2_tareas',
+  contactos: 'zs_v2_contactos',
+  avisos: 'zs_v2_avisos',
+  registro: 'zs_v2_registro',
+  log: 'zs_v2_log'
+};
+
+const ORDER = ['madrugada', 'manana', 'mediodia', 'tarde', 'noche'];
+const OPEN = ['pendiente', 'pospuesta'];
+const REDUCE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const ANIM_MS = {
+  'anim-check': 300,
+  'anim-out-down': 400,
+  'anim-out-shrink': 350,
+  'anim-pulse': 350
+};
+
+const META = {
+  madrugada: { title: 'MADRUGADA', color: '#D9D6CC' },
+  manana:    { title: 'MAÑANA',    color: '#E2EAE3' },
+  mediodia:  { title: 'MEDIODÍA',  color: '#F3ECDD' },
+  tarde:     { title: 'TARDE',     color: '#C8D6AF' },
+  noche:     { title: 'NOCHE',     color: '#EFE6D5' }
+};
+
+// Minutos desde medianoche. Solo se guardan los valores editables; el resto se calcula.
+const DEFAULT_AJUSTES = {
+  franjas: {
+    madrugada: { activa: false },
+    manana:    { inicio: 300, fin: 660 },
+    mediodia:  { activa: false, fin: 840 },
+    tarde:     { fin: 1080 },
+    noche:     { fin: 1320 }
+  },
+  avisos: { hora_fija_min: 15, sin_hora_min: 90, sonido: true }
+};
+
+const MIN_MEDIODIA = 120;
+const WHEEL_ITEM_H = 44;
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
+
+const DEMO_PHRASES = [
+  'Mañana tengo que ir a Boulogne a las 10 y llamar a Gustavo, a la tarde cortar el pasto',
+  'A la noche escribir a Mamá para saber cómo está',
+  'A las 3 tomar la pastilla'
+];
+
+/* ---------- Utilidades ---------- */
+const $ = (sel) => document.querySelector(sel);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const uid = () => 't_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36);
+const normKey = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (min) => pad(Math.floor(min / 60) % 24) + ':' + pad(min % 60);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const dur = (a, b) => (b - a + 1440) % 1440;
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function todayKey() { return dateKey(new Date()); }
+function tomorrowKey() { const d = new Date(); d.setDate(d.getDate() + 1); return dateKey(d); }
+
+/* ---------- Persistencia ---------- */
+function loadJSON(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; }
+  catch { return fallback; }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* sin storage: seguimos en memoria */ }
+}
+function loadAjustes() {
+  const a = clone(DEFAULT_AJUSTES);
+  const s = loadJSON(KEYS.ajustes, null);
+  if (s) {
+    if (s.franjas) for (const k of Object.keys(a.franjas)) Object.assign(a.franjas[k], s.franjas[k] || {});
+    if (s.avisos) Object.assign(a.avisos, s.avisos);
+  }
+  return a;
+}
+
+let aj = loadAjustes();
+let tasks = loadJSON(KEYS.tareas, []);
+let contactos = loadJSON(KEYS.contactos, {});
+let avisosHechos = loadJSON(KEYS.avisos, []);
+let registro = loadJSON(KEYS.registro, { fecha: '', pendientes_de_ayer: [], respondido: true });
+let listening = false;
+let busy = false;
+let demoIndex = 0;
+let draft = null;
+let pickerTarget = null;
+let pickerVal = { h: 0, m: 0 };
+let avisoActivo = null;
+let lastPeriod = null;
+
+let pendingFx = null;
+let glowKey = null;
+let animLock = false;
+
+function setPending(id, cls) { pendingFx = { id, cls }; }
+function persistTareas() { saveJSON(KEYS.tareas, tasks); }
+function persistAjustes() { saveJSON(KEYS.ajustes, aj); }
+
+/* ---------- Registro de uso (solo en el teléfono) ---------- */
+function logEvent(type, data = {}) {
+  const log = loadJSON(KEYS.log, []);
+  log.push({ t: new Date().toISOString(), tipo: type, ...data });
+  if (log.length > 3000) log.splice(0, log.length - 3000);
+  saveJSON(KEYS.log, log);
+}
+
+/* ---------- Franjas calculadas ---------- */
+function calc(a = aj) {
+  const m = a.franjas;
+  const medUsable = m.mediodia.activa && (m.mediodia.fin - m.manana.fin) >= MIN_MEDIODIA;
+  return {
+    madrugada: { start: 0, end: m.manana.inicio, activa: m.madrugada.activa },
+    manana:    { start: m.manana.inicio, end: m.manana.fin },
+    mediodia:  { start: m.manana.fin, end: m.mediodia.fin, activa: m.mediodia.activa, usable: medUsable },
+    tarde:     { start: medUsable ? m.mediodia.fin : m.manana.fin, end: m.tarde.fin },
+    noche:     { start: m.tarde.fin, end: m.noche.fin }
+  };
+}
+
+const inRange = (min, s, e) => min >= s && min < e;
+const inWrap = (min, s, e) => s === e ? false : (s < e ? inRange(min, s, e) : (min >= s || min < e));
+
+function franjaOfTime(min, f = calc()) {
+  if (inRange(min, 0, f.manana.start)) return 'madrugada';
+  if (inRange(min, f.manana.start, f.manana.end)) return 'manana';
+  if (f.mediodia.usable && inRange(min, f.mediodia.start, f.mediodia.end)) return 'mediodia';
+  if (inRange(min, f.tarde.start, f.tarde.end)) return 'tarde';
+  if (inWrap(min, f.noche.start, f.noche.end)) return 'noche';
+  return null;
+}
+
+function hasTasks(k, fecha) {
+  return tasks.some(t => t.fecha === fecha && t.franja === k && t.estado !== 'descartada');
+}
+
+function resolveKey(franja, f) {
+  if (franja === 'mediodia' && !f.mediodia.usable) return 'tarde';
+  return franja;
+}
+
+function nextVisibleAfter(k, f) {
+  const i = ORDER.indexOf(k);
+  for (let j = i + 1; j < ORDER.length; j++) {
+    const c = ORDER[j];
+    if (c === 'mediodia' && !f.mediodia.usable) continue;
+    if (c === 'madrugada') continue;
+    return c;
+  }
+  return null;
+}
+
+/* ==========================================================
+   MOCK AI — parser basado en reglas
+   ========================================================== */
+
+const TEMPORAL_MARK = /(?:(?:por|a|en|de)\s+la\s+)?(?<!\p{L})(madrugada|mañana|manana|mediodía|mediodia|tarde|noche)(?!\p{L})/giu;
+const HORA_RE = /a las\s+(\d{1,2})(?::(\d{2}))?(?:\s*(?:hs|h))?/i;
+
+const PERIOD_HINTS = [
+  ['manana', /(temprano|cami[oó]n|desayun|gimnasio|turno|levant)/i],
+  ['tarde',  /(proyecto|avanz|trabaj|escrib|estudi|pasto|cort|reuni|s[uú]per|compr|limpi)/i],
+  ['noche',  /(cena|cen[ae]r|dorm|descans|leer|serie|pel[ií]cula|relaj|mam[aá]|familia)/i]
+];
+
+function normPeriod(word) {
+  const w = normKey(word);
+  if (w === 'madrugada') return 'madrugada';
+  if (w === 'manana') return 'manana';
+  if (w === 'mediodia') return 'mediodia';
+  if (w === 'tarde') return 'tarde';
+  return 'noche';
+}
+
+function parseHora(m) {
+  const h = Number(m[1]);
+  const mi = Number(m[2] || 0);
+  return (h < 24 && mi < 60) ? h * 60 + mi : null;
+}
+
+function cleanChunk(s) {
+  let out = s.trim().replace(/[.!?]+$/g, '');
+  let prev;
+  do {
+    prev = out;
+    out = out.replace(/^(tengo que|tengo|hay que|debo|necesito|tendr[ií]a que|que|y|también)\s+/i, '');
+  } while (out !== prev);
+  out = out.trim();
+  return out ? out.charAt(0).toUpperCase() + out.slice(1) : '';
+}
+
+function suggestPeriod(text, fecha, batch, f) {
+  for (const [period, re] of PERIOD_HINTS) {
+    if (re.test(text)) return period;
+  }
+  const vis = ORDER.filter(k => k !== 'madrugada' && (k !== 'mediodia' || f.mediodia.usable));
+  const load = {};
+  vis.forEach(k => load[k] = 0);
+  [...tasks, ...batch].forEach(t => {
+    const p = resolveKey(t.franja, f);
+    if (t.fecha === fecha && load[p] !== undefined && t.estado !== 'descartada') load[p]++;
+  });
+  return vis.sort((a, b) => load[a] - load[b])[0];
+}
+
+const STOP_NAMES = new Set(['un', 'una', 'a', 'al', 'el', 'la', 'los', 'las', 'que', 'por', 'mi', 'su', 'lo', 'le']);
+const contactIdOf = (nombre) => 'c_' + normKey(nombre).replace(/\s+/g, '_');
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function extractCallAction(text) {
+  const m = text.match(/\bllam(?:ar|á|a|ame|alo|ale)(?!\p{L})\s+(?:a\s+(?:la\s+|el\s+)?|al\s+)?(\p{L}+)/iu);
+  if (!m || STOP_NAMES.has(normKey(m[1]))) return null;
+  let nombre = m[1];
+  const rest = text.slice(m.index + m[0].length);
+  const second = rest.match(/^\s+(\p{Lu}\p{Ll}+)/u);
+  if (second) nombre += ' ' + second[1];
+  nombre = capital(nombre);
+  return { tipo: 'llamar', nombre, contacto_id: contactIdOf(nombre) };
+}
+
+function extractWhatsAppAction(text) {
+  const m = text.match(/\b(whatsapp|wasap|wsp|escrib(?:ir|i|í|e)|mensaj(?:e|ear|ar)|avis(?:ar|a|e))\b\s+(?:a\s+|al\s+)?(\p{L}+)/iu);
+  if (!m || STOP_NAMES.has(normKey(m[2]))) return null;
+  const nombre = capital(m[2]);
+  return { tipo: 'whatsapp', nombre, contacto_id: contactIdOf(nombre) };
+}
+
+function extractGpsAction(text) {
+  const m1 = text.match(/\b(?:ir|voy|llegar)\s+(?:a\s+|al\s+|hasta\s+|por\s+)?(.+)$/iu);
+  const m2 = text.match(/\bpasar\s+(?:por|a)\s+(?:la\s+|el\s+|los\s+|las\s+)?(.+)$/iu);
+  let loc = m1 ? m1[1] : (m2 ? m2[1] : null);
+  if (!loc) return null;
+  loc = loc.replace(/\s+a\s+las?\s+\d.*$/i, '').replace(/^(el|la|los|las)\s+/i, '').replace(/[.!?]+$/g, '').trim();
+  if (loc.length < 3) return null;
+  return { tipo: 'gps', destino: loc };
+}
+
+function extractActions(text) {
+  const acts = [];
+  const wa = extractWhatsAppAction(text);
+  const call = extractCallAction(text);
+  const gps = extractGpsAction(text);
+  if (wa) acts.push(wa);
+  if (call) acts.push(call);
+  if (gps) acts.push(gps);
+  return acts;
+}
+
+function buildTask(texto, franja, fecha, hora) {
+  return {
+    id: uid(),
+    texto,
+    fecha,
+    franja,
+    hora_fija: hora ?? null,
+    prioritaria: false,
+    estado: 'pendiente',
+    origen: 'texto',
+    creada_en: new Date().toISOString(),
+    veces_pospuesta: 0,
+    acciones: extractActions(texto)
+  };
+}
+
+function parseInput(raw) {
+  const f = calc();
+  const text = raw.trim();
+  const marks = [...text.matchAll(TEMPORAL_MARK)];
+  const chunks = [];
+  let when = 'today';
+  let period = null;
+  let pos = 0;
+
+  for (const m of marks) {
+    const before = text.slice(pos, m.index);
+    if (before.trim()) chunks.push({ when, period, text: before });
+
+    const hasPrefix = /^(por|a|en|de)\s+la\s+/i.test(m[0]);
+    if (normKey(m[1]) === 'manana' && !hasPrefix) {
+      when = 'tomorrow';
+      period = null;
+    } else {
+      period = normPeriod(m[1]);
+    }
+    pos = m.index + m[0].length;
+  }
+  const tail = text.slice(pos);
+  if (tail.trim()) chunks.push({ when, period, text: tail });
+
+  const hoy = todayKey();
+  const manana = tomorrowKey();
+  const created = [];
+
+  for (const ch of chunks) {
+    const fecha = ch.when === 'tomorrow' ? manana : hoy;
+    for (const part of ch.text.split(/\s*[,;]\s*|\s+y\s+|\s*\.\s+/i)) {
+      const hm = part.match(HORA_RE);
+      const hora = hm ? parseHora(hm) : null;
+      const texto = cleanChunk(part.replace(HORA_RE, ' '));
+      if (!texto) continue;
+      const franja = ch.period
+        || (hora !== null ? franjaOfTime(hora, f) : null)
+        || suggestPeriod(texto, fecha, created, f);
+      created.push(buildTask(texto, franja || 'manana', fecha, hora));
+    }
+  }
+  return created;
+}
+
+/* ==========================================================
+   ACCIONES 1-CLICK
+   ========================================================== */
+
+function accionLabel(a) {
+  if (a.tipo === 'llamar') return `📞 Llamar a ${a.nombre}`;
+  if (a.tipo === 'whatsapp') return `💬 WhatsApp a ${a.nombre}`;
+  return '🗺️ Abrir GPS';
+}
+
+function runAccion(a) {
+  logEvent('accion', { accion: a.tipo });
+  if (a.tipo === 'gps') {
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.destino)}`;
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+  let c = contactos[a.contacto_id];
+  if (!c || !c.telefono) {
+    const input = window.prompt(`¿Cuál es el número de ${a.nombre}?\n(con código de país, ej: 5491112345678)`);
+    if (!input) return;
+    c = { id: a.contacto_id, nombre: a.nombre, telefono: input, whatsapp: true };
+    contactos[c.id] = c;
+    saveJSON(KEYS.contactos, contactos);
+  }
+  const phone = c.telefono.replace(/\D/g, '');
+  if (a.tipo === 'llamar') {
+    const el = document.createElement('a');
+    el.href = `tel:+${phone}`;
+    document.body.appendChild(el);
+    el.click();
+    el.remove();
+  } else {
+    window.open(`https://wa.me/${phone}`, '_blank', 'noopener');
+  }
+}
+
+/* ==========================================================
+   ANIMACIONES DE ACCIÓN
+   ========================================================== */
+
+function animThen(sel, cls, fn) {
+  if (animLock) return;
+  const el = sel ? document.querySelector(sel) : null;
+  const ms = REDUCE ? 0 : (ANIM_MS[cls] || 0);
+  if (!el || !ms) { fn(); return; }
+  animLock = true;
+  el.classList.add(cls);
+  setTimeout(() => { animLock = false; fn(); }, ms);
+}
+
+/* ==========================================================
+   ACCIONES SOBRE TAREAS
+   ========================================================== */
+
+function marcarHecha(t) {
+  t.estado = t.estado === 'hecha' ? 'pendiente' : 'hecha';
+  logEvent('accion_tarea', { accion: t.estado === 'hecha' ? 'hecha' : 'deshecha', franja: t.franja, con_hora: t.hora_fija !== null });
+  persistTareas();
+}
+
+function descartar(t) {
+  t.estado = 'descartada';
+  logEvent('accion_tarea', { accion: 'descartar', franja: t.franja, con_hora: t.hora_fija !== null });
+  persistTareas();
+}
+
+function moveToTomorrowManana(t) {
+  t.fecha = tomorrowKey();
+  t.franja = 'manana';
+  t.hora_fija = null;
+  t.estado = 'pospuesta';
+}
+
+// Regla: hora fija → +15 min. Sin hora → siguiente franja visible. Noche → mañana siguiente.
+function posponer(t) {
+  const f = calc();
+  const prev = t.veces_pospuesta;
+  const franjaAntes = t.franja;
+  t.veces_pospuesta++;
+  t.estado = 'pospuesta';
+
+  if (t.hora_fija !== null) {
+    const nuevo = t.hora_fija + 15;
+    const dest = nuevo < 1440 ? franjaOfTime(nuevo, f) : null;
+    if (dest) {
+      t.hora_fija = nuevo;
+      t.franja = dest;
+    } else if (t.franja === 'noche' && prev === 0 && nuevo < 1440) {
+      t.hora_fija = nuevo;
+    } else {
+      moveToTomorrowManana(t);
+    }
+  } else {
+    const next = nextVisibleAfter(t.franja, f);
+    if (next) t.franja = next;
+    else moveToTomorrowManana(t);
+  }
+
+  logEvent('accion_tarea', { accion: 'posponer', de: franjaAntes, a: t.franja, con_hora: t.hora_fija !== null });
+  persistTareas();
+}
+
+/* ==========================================================
+   CIERRE DE DÍA Y PENDIENTES DE AYER
+   ========================================================== */
+
+function rollover() {
+  const hoy = todayKey();
+  if (registro.fecha === hoy) return;
+  const ids = [];
+  tasks.forEach(t => {
+    if (t.fecha < hoy && OPEN.includes(t.estado)) {
+      t.fecha = hoy;
+      t.franja = 'manana';
+      t.hora_fija = null;
+      ids.push(t.id);
+    }
+  });
+  registro = { fecha: hoy, pendientes_de_ayer: ids, respondido: ids.length === 0 };
+  if (ids.length) logEvent('pendientes_ayer', { cantidad: ids.length });
+  persistTareas();
+  saveJSON(KEYS.registro, registro);
+}
+
+function renderPend() {
+  const wrap = $('#pend');
+  if (registro.respondido) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+
+  const list = registro.pendientes_de_ayer
+    .map(id => tasks.find(t => t.id === id))
+    .filter(t => t && OPEN.includes(t.estado));
+
+  if (!list.length) {
+    registro.respondido = true;
+    saveJSON(KEYS.registro, registro);
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = `
+    <div class="rounded-[1.5rem] bg-white/70 p-4 soft-shadow">
+      <p class="text-[15px] font-medium">¿Pudiste hacer estas?</p>
+      <p class="mt-1 text-[13px] text-muted">Lo que no hagas queda en la mañana de hoy.</p>
+      <div class="mt-3 space-y-2">
+        ${list.map(t => `
+          <div data-tid="${t.id}" class="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2">
+            <span class="flex-1 text-[14px] leading-snug">${esc(t.texto)}</span>
+            <button data-pend-ok="${t.id}" class="rounded-full px-3 py-1.5 text-[12px] font-bold text-ink" style="background:#F5C2A0">Hecha</button>
+            <button data-pend-no="${t.id}" class="rounded-full border border-[#E6DFCD] px-3 py-1.5 text-[12px] text-muted">Descartar</button>
+          </div>`).join('')}
+      </div>
+      <button id="pend-close" class="mt-3 w-full rounded-full py-2.5 text-[13px] text-muted">Listo, así queda</button>
+    </div>`;
+}
+
+/* ==========================================================
+   AVISOS (dentro de la app, mientras esté abierta)
+   ========================================================== */
+
+function beep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 660;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.7);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.7);
+  } catch { /* sin audio: silencio */ }
+}
+
+function mostrarAviso(t, key) {
+  logEvent('aviso', { aviso_tipo: t.hora_fija !== null ? 'hora_fija' : 'sin_hora', pospuesta: t.estado === 'pospuesta' });
+  avisoActivo = { id: t.id, key };
+  const texto = t.texto.charAt(0).toLowerCase() + t.texto.slice(1);
+  $('#aviso-txt').textContent = t.hora_fija !== null
+    ? (t.estado === 'pospuesta'
+        ? `Recordatorio: ${texto}. Cuando quieras, acá lo tienes.`
+        : `En ${aj.avisos.hora_fija_min} min: ${texto}. Cuando quieras, acá lo tienes.`)
+    : `Cuando puedas: ${texto}.`;
+  $('#aviso').classList.remove('hidden');
+  avisosHechos.push(key);
+  if (avisosHechos.length > 300) avisosHechos = avisosHechos.slice(-300);
+  saveJSON(KEYS.avisos, avisosHechos);
+}
+
+function cerrarAviso() {
+  avisoActivo = null;
+  $('#aviso').classList.add('hidden');
+}
+
+function checkAvisos() {
+  const f = calc();
+  const min = nowMin();
+  const hoy = todayKey();
+  const actual = franjaOfTime(min, f);
+
+  if (actual && lastPeriod && lastPeriod !== actual) {
+    const pendientes = tasks.some(t => t.fecha === hoy && OPEN.includes(t.estado) && resolveKey(t.franja, f) === lastPeriod);
+    if (pendientes && aj.avisos.sonido) beep();
+    logEvent('cambio_franja', { de: lastPeriod, a: actual, con_pendientes: pendientes });
+    glowKey = actual;
+    render();
+  }
+  if (actual) lastPeriod = actual;
+
+  if (avisoActivo) return;
+
+  for (const t of tasks) {
+    if (t.fecha !== hoy || !OPEN.includes(t.estado)) continue;
+
+    if (t.hora_fija !== null) {
+      const pos = t.estado === 'pospuesta';
+      const inicio = pos ? t.hora_fija : t.hora_fija - aj.avisos.hora_fija_min;
+      const largo = pos ? 15 : aj.avisos.hora_fija_min;
+      const elapsed = (min - ((inicio + 1440) % 1440) + 1440) % 1440;
+      const key = `${t.id}|${t.hora_fija}|${t.veces_pospuesta}`;
+      if (elapsed < largo && !avisosHechos.includes(key)) { mostrarAviso(t, key); return; }
+    } else {
+      const fr = f[resolveKey(t.franja, f)];
+      if (!fr) continue;
+      const inicio = (fr.end - aj.avisos.sin_hora_min + 1440) % 1440;
+      const elapsed = (min - inicio + 1440) % 1440;
+      const key = `${t.id}|sh|${hoy}`;
+      if (elapsed < aj.avisos.sin_hora_min && !avisosHechos.includes(key)) { mostrarAviso(t, key); return; }
+    }
+  }
+}
+
+/* ==========================================================
+   RENDER DEL TABLERO
+   ========================================================== */
+
+function taskHTML(t) {
+  const done = t.estado === 'hecha';
+  const acts = t.acciones.map((a, i) => `
+    <button data-act="${t.id}" data-i="${i}"
+            class="rounded-full px-3.5 py-2 text-[13px] font-bold text-ink shadow-sm transition active:scale-95"
+            style="background:#F5C2A0">${accionLabel(a)}</button>`).join('');
+  const mas = !done
+    ? `<button data-mas="${t.id}" class="rounded-full border border-[#E6DFCD] px-3 py-2 text-[13px] text-muted transition active:scale-95">Más tarde</button>`
+    : '';
+  const hora = t.hora_fija !== null ? `<span class="text-muted">${fmt(t.hora_fija)} · </span>` : '';
+
+  return `
+    <div data-tid="${t.id}" class="task-card rounded-2xl bg-white/50 p-3.5 ${done ? 'is-done' : ''}">
+      <div class="flex items-start gap-3">
+        <button data-hecha="${t.id}" aria-label="Marcar como hecha"
+                class="relative mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition
+                       ${done ? 'border-ink/70 bg-ink/70' : 'border-ink/30'}">
+          <svg class="chk absolute inset-0 m-auto h-3.5 w-3.5 text-sand" viewBox="0 0 16 16" fill="none"
+               stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 8.5l3 3 7-7"></path>
+          </svg>
+        </button>
+        <p class="flex-1 text-[15px] leading-snug ${done ? 'line-through' : ''}">${hora}${esc(t.texto)}</p>
+        <button data-prio="${t.id}" aria-label="Prioritaria" class="px-1 text-lg leading-none ${t.prioritaria ? 'text-ink' : 'text-muted/50'}">★</button>
+        <button data-del="${t.id}" aria-label="Descartar" class="px-1 text-lg leading-none text-muted/70">×</button>
+      </div>
+      ${(acts || mas) ? `<div class="mt-3 flex flex-wrap gap-2 pl-9">${acts}${mas}</div>` : ''}
+    </div>`;
+}
+
+function cardHTML(k, items, f) {
+  const m = META[k];
+  const r = f[k];
+  const body = items.length
+    ? items.map(taskHTML).join('')
+    : `<p class="py-2 text-sm italic text-muted/80">Nada por ahora. Respirá.</p>`;
+  return `
+    <section data-card="${k}" class="soft-shadow rounded-[1.75rem] p-5" style="background:${m.color}">
+      <h2 class="font-serif text-xl tracking-wide">${m.title}</h2>
+      <p class="mb-3 text-xs text-muted">${fmt(r.start)} a ${fmt(r.end)}</p>
+      <div class="space-y-3">${body}</div>
+    </section>`;
+}
+
+function render() {
+  const hoy = todayKey();
+  const f = calc();
+  const list = tasks.filter(t => t.fecha === hoy && t.estado !== 'descartada');
+
+  const keys = ORDER.filter(k => {
+    if (k === 'madrugada') return f.madrugada.activa || hasTasks('madrugada', hoy);
+    if (k === 'mediodia') return f.mediodia.usable;
+    return true;
+  });
+
+  const cards = keys.map(k => {
+    const items = list
+      .filter(t => resolveKey(t.franja, f) === k)
+      .sort((a, b) => (b.prioritaria - a.prioritaria) || ((a.hora_fija ?? 9999) - (b.hora_fija ?? 9999)));
+    return cardHTML(k, items, f);
+  }).join('');
+
+  let extras = '';
+  if (!f.madrugada.activa) extras += `<button data-activar="madrugada" class="rounded-full border border-[#E6DFCD] bg-white/60 px-3.5 py-1.5 text-[12px] text-muted transition active:scale-95">+ Madrugada</button>`;
+  if (!f.mediodia.usable) extras += `<button data-activar="mediodia" class="rounded-full border border-[#E6DFCD] bg-white/60 px-3.5 py-1.5 text-[12px] text-muted transition active:scale-95">+ Mediodía</button>`;
+
+  const extrasHTML = extras ? `<div class="flex justify-center gap-2 pt-1">${extras}</div>` : '';
+  const vacio = !list.length
+    ? `<button id="example" class="mx-auto block rounded-full border border-[#E6DFCD] bg-white/60 px-4 py-2 text-[13px] text-muted transition active:scale-95">Probá: "${esc(DEMO_PHRASES[0].slice(0, 42))}…"</button>`
+    : '';
+
+  const board = $('#board');
+  board.innerHTML = cards + extrasHTML + vacio;
+
+  if (pendingFx) {
+    const el = board.querySelector(`[data-tid="${pendingFx.id}"]`);
+    if (el) el.classList.add(pendingFx.cls);
+    pendingFx = null;
+  }
+  if (glowKey) {
+    const sec = board.querySelector(`[data-card="${glowKey}"]`);
+    if (sec) sec.classList.add('anim-glow');
+    glowKey = null;
+  }
+}
+
+/* ==========================================================
+   AJUSTES: franjas, toggles y validación
+   ========================================================== */
+
+function activarFranja(obj, k) {
+  const fr = obj.franjas;
+  fr[k].activa = !fr[k].activa;
+  logEvent('ajuste_franja', { franja: k, activa: fr[k].activa });
+  if (k === 'mediodia' && fr.mediodia.activa) {
+    const minFin = fr.manana.fin;
+    if (fr.mediodia.fin - minFin < MIN_MEDIODIA) {
+      fr.mediodia.fin = Math.min(1439, minFin + MIN_MEDIODIA);
+    }
+  }
+}
+
+function validateAjustes(a) {
+  const f = calc(a);
+  const m = a.franjas;
+  if (m.manana.fin - m.manana.inicio < 60) return 'Mañana necesita al menos 1 hora. Revisa su fin.';
+  if (m.mediodia.activa && m.mediodia.fin <= m.manana.fin) return 'Mediodía tiene que terminar después de Mañana.';
+  if (f.tarde.end - f.tarde.start < 60) return 'Tarde necesita al menos 1 hora. Revisa su fin.';
+  const durN = dur(f.noche.start, f.noche.end);
+  const maxN = dur(f.noche.start, m.manana.inicio);
+  if (durN < 60 || durN > maxN) {
+    return 'Noche dura al menos 1 hora y tiene que terminar antes o justo cuando empieza Mañana.';
+  }
+  return '';
+}
+
+function openConfig() {
+  draft = clone(aj);
+  renderConfig();
+  $('#hf-min').textContent = aj.avisos.hora_fija_min;
+  $('#config').classList.remove('hidden');
+}
+
+function closeConfig() {
+  $('#config').classList.add('hidden');
+  draft = null;
+}
+
+function fieldHTML(k, field, value, editable) {
+  const label = field === 'start' ? 'Inicio' : 'Fin';
+  const base = 'flex-1 rounded-xl px-3 py-2 text-left';
+  const inner = `<span class="block text-[11px] text-muted">${label}</span>
+                 <span class="block text-[17px] font-medium">${fmt(value)}</span>`;
+  return editable
+    ? `<button data-edit="${k}" data-field="${field}" class="${base} bg-white/60 transition active:scale-95">${inner}</button>`
+    : `<div class="${base} bg-white/30 opacity-70">${inner}</div>`;
+}
+
+function renderConfig() {
+  const f = calc(draft);
+  const m = draft.franjas;
+
+  $('#config-body').innerHTML = ORDER.map(k => {
+    const meta = META[k];
+    const r = f[k];
+    let note = '';
+    let toggle = '';
+    let endEditable = true;
+
+    if (k === 'manana') {
+      note = 'Aquí empieza tu día. Todo lo de madrugada termina donde empieza Mañana.';
+    }
+    if (k === 'madrugada') {
+      const on = m.madrugada.activa;
+      toggle = `<button data-toggle="madrugada" class="rounded-full border border-[#E6DFCD] bg-white/60 px-3 py-1.5 text-[12px] transition active:scale-95">${on ? 'Activa' : 'Oculta'}</button>`;
+      note = on
+        ? 'Aparece en el tablero. Si programas algo entre 00:00 y Mañana, aparece sola.'
+        : 'Oculta. Aparece si la activas o si programas algo de madrugada.';
+    }
+    if (k === 'mediodia') {
+      const on = m.mediodia.activa;
+      toggle = `<button data-toggle="mediodia" class="rounded-full border border-[#E6DFCD] bg-white/60 px-3 py-1.5 text-[12px] transition active:scale-95">${on ? 'Activa' : 'Oculta'}</button>`;
+      endEditable = on;
+      note = r.usable
+        ? 'Empieza cuando termina Mañana.'
+        : (on ? 'Dura menos de 2 h, así que se oculta. Sus tareas pasan a Tarde.' : 'Oculta por defecto. Actívala si la necesitas.');
+    }
+    if (k === 'tarde') {
+      note = `Empieza cuando termina ${f.mediodia.usable ? 'Mediodía' : 'Mañana'}.`;
+    }
+    if (k === 'noche') {
+      note = 'Puede cruzar la medianoche. Por defecto termina a las 22:00.';
+    }
+
+    const startEditable = k === 'manana';
+    const endField = k === 'madrugada' ? null : 'fin';
+
+    return `
+      <div class="rounded-[1.25rem] p-4" style="background:${meta.color}">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[15px] font-medium">${meta.title}</p>
+          ${toggle}
+        </div>
+        <p class="mt-1 text-[12px] leading-relaxed text-muted">${note}</p>
+        <div class="mt-3 flex items-center gap-2">
+          ${fieldHTML(k, 'start', r.start, startEditable)}
+          <span class="text-muted">→</span>
+          ${endField ? fieldHTML(k, 'end', r.end, endEditable) : fieldHTML(k, 'end', r.end, false)}
+        </div>
+      </div>`;
+  }).join('');
+
+  const err = validateAjustes(draft);
+  const errEl = $('#config-error');
+  errEl.textContent = err;
+  errEl.classList.toggle('hidden', !err);
+
+  $('#toggle-sonido').textContent = draft.avisos.sonido ? 'Sonido: activado' : 'Sonido: silencio';
+}
+
+function openPicker(k, field) {
+  pickerTarget = { k, field };
+  const cur = draft.franjas[k][field];
+  const h = Math.floor(cur / 60) % 24;
+  const m = (Math.round((cur % 60) / 5) * 5) % 60;
+  pickerVal = { h, m };
+
+  $('#picker-title').textContent = `${META[k].title} · ${field === 'start' ? 'Inicio' : 'Fin'}`;
+  const wrap = $('#wheel-wrap');
+  wrap.innerHTML = '<div class="wheel-hl"></div>';
+  wrap.appendChild(buildWheel(HOURS, h, v => { pickerVal.h = v; }));
+  wrap.appendChild(buildWheel(MINUTES, MINUTES.indexOf(m), v => { pickerVal.m = v; }));
+  $('#picker').classList.remove('hidden');
+}
+
+function buildWheel(values, selIdx, onChange) {
+  const col = document.createElement('div');
+  col.className = 'wheel';
+  const spacer = () => { const s = document.createElement('div'); s.style.height = '88px'; return s; };
+  col.appendChild(spacer());
+  values.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'wheel-item' + (i === selIdx ? ' on' : '');
+    d.textContent = pad(v);
+    col.appendChild(d);
+  });
+  col.appendChild(spacer());
+  col.addEventListener('scroll', () => {
+    const idx = Math.max(0, Math.min(values.length - 1, Math.round(col.scrollTop / WHEEL_ITEM_H)));
+    col.querySelectorAll('.wheel-item').forEach((el, j) => el.classList.toggle('on', j === idx));
+    onChange(values[idx]);
+  });
+  requestAnimationFrame(() => { col.scrollTop = selIdx * WHEEL_ITEM_H; });
+  return col;
+}
+
+function closePicker() {
+  $('#picker').classList.add('hidden');
+  pickerTarget = null;
+}
+
+/* ---------- Toast ---------- */
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.remove('hidden', 'toast-enter');
+  void el.offsetWidth;
+  el.classList.add('toast-enter');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.add('hidden'), 3200);
+}
+
+function updateButtons() {
+  const hasText = $('#input').value.trim().length > 0;
+  $('#send').classList.toggle('hidden', !hasText);
+  $('#send').classList.toggle('grid', hasText);
+  $('#mic').classList.toggle('hidden', hasText);
+}
+
+function setBusy(state) {
+  busy = state;
+  const input = $('#input');
+  input.disabled = state;
+  input.placeholder = state ? 'Ordenando tu día…' : 'Dicta o escribe tu día sin orden...';
+}
+
+/* ==========================================================
+   FLUJO PRINCIPAL
+   ========================================================== */
+
+async function submitText(raw) {
+  const text = (raw || '').trim();
+  if (!text || busy) return;
+
+  $('#input').value = '';
+  updateButtons();
+  setBusy(true);
+  await wait(650);
+
+  const created = parseInput(text);
+  setBusy(false);
+
+  logEvent('captura', {
+    texto: text,
+    tareas: created.length,
+    franjas: created.map(t => t.franja),
+    con_hora: created.filter(t => t.hora_fija !== null).length
+  });
+
+  if (!created.length) {
+    toast('No encontré nada que hacer. Probá de nuevo cuando quieras.');
+    return;
+  }
+
+  tasks.push(...created);
+  persistTareas();
+  render();
+
+  const hoy = todayKey();
+  const hoyList = created.filter(t => t.fecha === hoy);
+  const later = created.length - hoyList.length;
+
+  if (!hoyList.length) {
+    toast('Listo, lo guardé para mañana.');
+    return;
+  }
+
+  const usados = [...new Set(hoyList.map(t => META[t.franja].title.toLowerCase()))];
+  const readable = usados.length > 1 ? usados.slice(0, -1).join(', ') + ' y ' + usados.slice(-1) : usados[0];
+  toast(`Listo, lo acomodé en ${readable}.` + (later ? ' Lo demás queda para mañana.' : ''));
+}
+
+/* ---------- Dictado por voz ---------- */
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function startPulse() { listening = true; $('#mic').classList.add('listening'); }
+function stopPulse() { listening = false; $('#mic').classList.remove('listening'); }
+
+function startDictation() {
+  if (busy || listening) return;
+
+  if (SpeechRec) {
+    try {
+      const rec = new SpeechRec();
+      rec.lang = 'es-AR';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onresult = (e) => { stopPulse(); submitText(e.results[0][0].transcript); };
+      rec.onerror = () => { stopPulse(); toast('No pude escucharte. Probá escribiendo.'); };
+      rec.onend = stopPulse;
+      startPulse();
+      rec.start();
+      return;
+    } catch { stopPulse(); }
+  }
+
+  startPulse();
+  const phrase = DEMO_PHRASES[demoIndex++ % DEMO_PHRASES.length];
+  const input = $('#input');
+  input.value = '';
+  updateButtons();
+  let i = 0;
+  const timer = setInterval(() => {
+    input.value += phrase[i++];
+    updateButtons();
+    if (i >= phrase.length) {
+      clearInterval(timer);
+      stopPulse();
+      setTimeout(() => submitText(phrase), 400);
+    }
+  }, 32);
+}
+
+/* ---------- Eventos ---------- */
+$('#form').addEventListener('submit', (e) => { e.preventDefault(); submitText($('#input').value); });
+$('#input').addEventListener('input', updateButtons);
+$('#mic').addEventListener('click', startDictation);
+
+// Registro de cada toque en un botón
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('button');
+  if (!el) return;
+  const name = el.id || Object.keys(el.dataset)[0] || el.textContent.trim().slice(0, 30);
+  logEvent('toque', { elemento: name });
+}, true);
+
+window.addEventListener('error', (e) => logEvent('error', { msg: e.message, linea: e.lineno }));
+
+$('#board').addEventListener('click', (e) => {
+  const hecha = e.target.closest('[data-hecha]');
+  if (hecha) {
+    const t = tasks.find(x => x.id === hecha.dataset.hecha);
+    if (!t) return;
+    marcarHecha(t);
+    if (t.estado === 'hecha') setPending(t.id, 'anim-check');
+    render();
+    return;
+  }
+
+  const prio = e.target.closest('[data-prio]');
+  if (prio) {
+    const id = prio.dataset.prio;
+    animThen(`[data-prio="${id}"]`, 'anim-pulse', () => {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      t.prioritaria = !t.prioritaria;
+      logEvent('accion_tarea', { accion: 'prioritaria', valor: t.prioritaria });
+      persistTareas();
+      setPending(id, 'anim-rise');
+      render();
+    });
+    return;
+  }
+
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    const id = del.dataset.del;
+    animThen(`[data-tid="${id}"]`, 'anim-out-shrink', () => {
+      const t = tasks.find(x => x.id === id);
+      if (t) descartar(t);
+      render();
+    });
+    return;
+  }
+
+  const mas = e.target.closest('[data-mas]');
+  if (mas) {
+    const id = mas.dataset.mas;
+    animThen(`[data-tid="${id}"]`, 'anim-out-down', () => {
+      const t = tasks.find(x => x.id === id);
+      if (t) { posponer(t); setPending(id, 'anim-in'); }
+      render();
+    });
+    return;
+  }
+
+  const act = e.target.closest('[data-act]');
+  if (act) {
+    const t = tasks.find(x => x.id === act.dataset.act);
+    if (t) runAccion(t.acciones[Number(act.dataset.i)]);
+    return;
+  }
+
+  const activar = e.target.closest('[data-activar]');
+  if (activar) {
+    activarFranja(aj, activar.dataset.activar);
+    persistAjustes();
+    render();
+    return;
+  }
+
+  const example = e.target.closest('#example');
+  if (example) {
+    $('#input').value = DEMO_PHRASES[0];
+    updateButtons();
+    $('#input').focus();
+  }
+});
+
+$('#pend').addEventListener('click', (e) => {
+  const ok = e.target.closest('[data-pend-ok]');
+  if (ok) {
+    const id = ok.dataset.pendOk;
+    animThen(`#pend [data-tid="${id}"]`, 'anim-out-shrink', () => {
+      const t = tasks.find(x => x.id === id);
+      if (t) { t.estado = 'hecha'; logEvent('accion_tarea', { accion: 'hecha_pendiente_ayer' }); persistTareas(); }
+      setPending(id, 'anim-check');
+      render();
+      renderPend();
+    });
+    return;
+  }
+  const no = e.target.closest('[data-pend-no]');
+  if (no) {
+    const id = no.dataset.pendNo;
+    animThen(`#pend [data-tid="${id}"]`, 'anim-out-shrink', () => {
+      const t = tasks.find(x => x.id === id);
+      if (t) descartar(t);
+      render();
+      renderPend();
+    });
+    return;
+  }
+  if (e.target.closest('#pend-close')) {
+    registro.respondido = true;
+    saveJSON(KEYS.registro, registro);
+    renderPend();
+  }
+});
+
+$('#aviso-ok').addEventListener('click', () => {
+  if (!avisoActivo) return;
+  const id = avisoActivo.id;
+  animThen(`[data-tid="${id}"]`, 'anim-check', () => {
+    const t = tasks.find(x => x.id === id);
+    if (t) { t.estado = 'hecha'; logEvent('accion_tarea', { accion: 'hecha_desde_aviso' }); persistTareas(); }
+    cerrarAviso();
+    setPending(id, 'anim-check');
+    render();
+  });
+});
+
+$('#aviso-later').addEventListener('click', () => {
+  if (!avisoActivo) return;
+  const id = avisoActivo.id;
+  animThen(`[data-tid="${id}"]`, 'anim-out-down', () => {
+    const t = tasks.find(x => x.id === id);
+    if (t) { posponer(t); setPending(id, 'anim-in'); }
+    cerrarAviso();
+    render();
+  });
+});
+
+$('#open-config').addEventListener('click', openConfig);
+$('#config-close').addEventListener('click', closeConfig);
+$('#config-bg').addEventListener('click', closeConfig);
+
+$('#config-body').addEventListener('click', (e) => {
+  const edit = e.target.closest('[data-edit]');
+  if (edit) { openPicker(edit.dataset.edit, edit.dataset.field); return; }
+  const tog = e.target.closest('[data-toggle]');
+  if (tog) {
+    activarFranja(draft, tog.dataset.toggle);
+    renderConfig();
+  }
+});
+
+$('#toggle-sonido').addEventListener('click', () => {
+  draft.avisos.sonido = !draft.avisos.sonido;
+  renderConfig();
+});
+
+$('#config-reset').addEventListener('click', () => {
+  draft = clone(DEFAULT_AJUSTES);
+  renderConfig();
+});
+
+$('#config-save').addEventListener('click', () => {
+  const err = validateAjustes(draft);
+  if (err) { renderConfig(); return; }
+  aj = clone(draft);
+  persistAjustes();
+  logEvent('ajustes_guardados', { franjas: aj.franjas, avisos: aj.avisos });
+  closeConfig();
+  render();
+  toast('Ajustes guardados.');
+});
+
+$('#picker-ok').addEventListener('click', () => {
+  if (!pickerTarget) return;
+  draft.franjas[pickerTarget.k][pickerTarget.field] = pickerVal.h * 60 + pickerVal.m;
+  closePicker();
+  renderConfig();
+});
+$('#picker-cancel').addEventListener('click', closePicker);
+$('#picker-bg').addEventListener('click', closePicker);
+
+$('#log-export').addEventListener('click', async () => {
+  const txt = JSON.stringify(loadJSON(KEYS.log, []), null, 2);
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast('Datos copiados. Pégalos en el chat.');
+  } catch {
+    window.prompt('Copia este texto:', txt);
+  }
+});
+
+$('#log-clear').addEventListener('click', () => {
+  if (!window.confirm('¿Borrar todos los datos de prueba?')) return;
+  saveJSON(KEYS.log, []);
+  toast('Datos de prueba borrados.');
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    rollover();
+    render();
+    renderPend();
+    checkAvisos();
+  }
+});
+
+/* ---------- Init ---------- */
+$('#date').textContent = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+rollover();
+lastPeriod = franjaOfTime(nowMin());
+glowKey = lastPeriod;
+render();
+renderPend();
+updateButtons();
+checkAvisos();
+setInterval(checkAvisos, 20000);
+</script>
+</body>
+  </html>
