@@ -41,7 +41,6 @@
     .wheel-item { height: 44px; line-height: 44px; text-align: center; scroll-snap-align: center; font-size: 22px; color: #8C8273; font-variant-numeric: tabular-nums; }
     .wheel-item.on { color: #4A4339; font-weight: 700; }
 
-    /* ---------- Tareas ---------- */
     .task-card { overflow: hidden; }
     .is-done { opacity: .55; }
     .chk { opacity: 0; }
@@ -105,6 +104,7 @@
         </div>
       </div>
       <div id="pend" class="hidden"></div>
+      <div id="prox" class="hidden"></div>
     </div>
 
     <main id="board" class="flex-1 space-y-4 px-5 pt-4 pb-6"></main>
@@ -151,6 +151,12 @@
       <div id="config-body" class="mt-3 space-y-3"></div>
       <p id="config-error" class="hidden mt-3 rounded-2xl bg-white/60 px-4 py-3 text-[13px] leading-relaxed"></p>
 
+      <p class="mt-6 text-[12px] font-bold tracking-[0.2em] text-muted">PLANIFICAR</p>
+      <div class="mt-3 rounded-[1.25rem] bg-white/50 p-4">
+        <p class="text-[14px] leading-relaxed">Después de las 14:00, lo que dictes para la tarde o la noche, sin decir el día, va a mañana.</p>
+        <button id="toggle-planif" class="mt-3 rounded-full border border-[#E6DFCD] bg-white/60 px-4 py-2 text-[13px] transition active:scale-95"></button>
+      </div>
+
       <p class="mt-6 text-[12px] font-bold tracking-[0.2em] text-muted">AVISOS</p>
       <div class="mt-3 rounded-[1.25rem] bg-white/50 p-4 text-[14px] leading-relaxed">
         <p>Tareas con hora: aviso <span id="hf-min"></span> min antes.</p>
@@ -192,7 +198,8 @@
 <script>
 /* ==========================================================
    ZERO STRESS — prototipo de pruebas
-   Modelo de datos v2 + animaciones + registro de uso local
+   Parser por frase, planificación, Próximamente, animaciones,
+   registro de uso local.
    ========================================================== */
 
 const KEYS = {
@@ -207,6 +214,7 @@ const KEYS = {
 const ORDER = ['madrugada', 'manana', 'mediodia', 'tarde', 'noche'];
 const OPEN = ['pendiente', 'pospuesta'];
 const REDUCE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const PROX_DIAS = 14;
 
 const ANIM_MS = {
   'anim-check': 300,
@@ -223,7 +231,7 @@ const META = {
   noche:     { title: 'NOCHE',     color: '#EFE6D5' }
 };
 
-// Minutos desde medianoche. Solo se guardan los valores editables; el resto se calcula.
+// Minutos desde medianoche
 const DEFAULT_AJUSTES = {
   franjas: {
     madrugada: { activa: false },
@@ -232,13 +240,15 @@ const DEFAULT_AJUSTES = {
     tarde:     { fin: 1080 },
     noche:     { fin: 1320 }
   },
-  avisos: { hora_fija_min: 15, sin_hora_min: 90, sonido: true }
+  avisos: { hora_fija_min: 15, sin_hora_min: 90, sonido: true },
+  planificacion: { tarde_noche_a_manana: true }
 };
 
 const MIN_MEDIODIA = 120;
 const WHEEL_ITEM_H = 44;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
+const MESES = { enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio: 6, agosto: 7, septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11 };
 
 const DEMO_PHRASES = [
   'Mañana tengo que ir a Boulogne a las 10 y llamar a Gustavo, a la tarde cortar el pasto',
@@ -257,10 +267,12 @@ const fmt = (min) => pad(Math.floor(min / 60) % 24) + ':' + pad(min % 60);
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const dur = (a, b) => (b - a + 1440) % 1440;
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
 function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 function todayKey() { return dateKey(new Date()); }
-function tomorrowKey() { const d = new Date(); d.setDate(d.getDate() + 1); return dateKey(d); }
+function tomorrowKey() { return dateKey(addDays(new Date(), 1)); }
+function keyToDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
 
 /* ---------- Persistencia ---------- */
 function loadJSON(key, fallback) {
@@ -276,6 +288,7 @@ function loadAjustes() {
   if (s) {
     if (s.franjas) for (const k of Object.keys(a.franjas)) Object.assign(a.franjas[k], s.franjas[k] || {});
     if (s.avisos) Object.assign(a.avisos, s.avisos);
+    if (s.planificacion) Object.assign(a.planificacion, s.planificacion);
   }
   return a;
 }
@@ -293,6 +306,7 @@ let pickerTarget = null;
 let pickerVal = { h: 0, m: 0 };
 let avisoActivo = null;
 let lastPeriod = null;
+let proxOpen = false;
 
 let pendingFx = null;
 let glowKey = null;
@@ -356,11 +370,17 @@ function nextVisibleAfter(k, f) {
 }
 
 /* ==========================================================
-   MOCK AI — parser basado en reglas
+   PARSER basado en reglas (respaldo de la futura IA)
+   Cada frase se analiza sola. Una franja no se contagia
+   a las frases siguientes; solo el día puede heredarse
+   dentro de la misma enumeración separada por comas o "y".
    ========================================================== */
 
-const TEMPORAL_MARK = /(?:(?:por|a|en|de)\s+la\s+)?(?<!\p{L})(madrugada|mañana|manana|mediodía|mediodia|tarde|noche)(?!\p{L})/giu;
+const HARD_SPLIT = /\s+(?:porque|pero|aunque)\s+/i;
+const SOFT_SPLIT = /\s*[,;]\s*|\s+y\s+|\s*\.\s+/i;
+const MARKS = /(?:(?:por|a|en|de)\s+la\s+|de\s+)?(?<!\p{L})(madrugada|mañana|manana|mediodía|mediodia|tarde|noche|hoy)(?!\p{L})/giu;
 const HORA_RE = /a las\s+(\d{1,2})(?::(\d{2}))?(?:\s*(?:hs|h))?/i;
+const FECHA_RE = /\bel\s+(\d{1,2})\s+de\s+(\p{L}+)/iu;
 
 const PERIOD_HINTS = [
   ['manana', /(temprano|cami[oó]n|desayun|gimnasio|turno|levant)/i],
@@ -383,6 +403,34 @@ function parseHora(m) {
   return (h < 24 && mi < 60) ? h * 60 + mi : null;
 }
 
+function parseFecha(seg) {
+  const m = seg.match(FECHA_RE);
+  if (!m) return null;
+  const mes = MESES[normKey(m[2])];
+  const dia = Number(m[1]);
+  if (mes === undefined || dia < 1 || dia > 31) return null;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  let d = new Date(hoy.getFullYear(), mes, dia);
+  if (d < hoy) d = new Date(hoy.getFullYear() + 1, mes, dia);
+  return { key: dateKey(d), text: m[0] };
+}
+
+// Lee las marcas temporales de un trozo y devuelve el día, la franja y el texto sin marcas
+function readMarks(seg) {
+  let when = null;
+  let franja = null;
+  const clean = seg.replace(MARKS, (full, word) => {
+    const w = normKey(word);
+    const conPrep = /^(por|a|en|de)\s+la\s+|^de\s+/i.test(full);
+    if (w === 'hoy') when = 'today';
+    else if (w === 'manana' && !conPrep) when = 'tomorrow';
+    else franja = normPeriod(w);
+    return ' ';
+  });
+  return { when, franja, clean };
+}
+
 function cleanChunk(s) {
   let out = s.trim().replace(/[.!?]+$/g, '');
   let prev;
@@ -390,7 +438,7 @@ function cleanChunk(s) {
     prev = out;
     out = out.replace(/^(tengo que|tengo|hay que|debo|necesito|tendr[ií]a que|que|y|también)\s+/i, '');
   } while (out !== prev);
-  out = out.trim();
+  out = out.replace(/\s{2,}/g, ' ').trim();
   return out ? out.charAt(0).toUpperCase() + out.slice(1) : '';
 }
 
@@ -469,43 +517,47 @@ function buildTask(texto, franja, fecha, hora) {
 
 function parseInput(raw) {
   const f = calc();
-  const text = raw.trim();
-  const marks = [...text.matchAll(TEMPORAL_MARK)];
-  const chunks = [];
-  let when = 'today';
-  let period = null;
-  let pos = 0;
-
-  for (const m of marks) {
-    const before = text.slice(pos, m.index);
-    if (before.trim()) chunks.push({ when, period, text: before });
-
-    const hasPrefix = /^(por|a|en|de)\s+la\s+/i.test(m[0]);
-    if (normKey(m[1]) === 'manana' && !hasPrefix) {
-      when = 'tomorrow';
-      period = null;
-    } else {
-      period = normPeriod(m[1]);
-    }
-    pos = m.index + m[0].length;
-  }
-  const tail = text.slice(pos);
-  if (tail.trim()) chunks.push({ when, period, text: tail });
-
   const hoy = todayKey();
   const manana = tomorrowKey();
+  const planifNoche = aj.planificacion.tarde_noche_a_manana && nowMin() >= f.tarde.start;
   const created = [];
 
-  for (const ch of chunks) {
-    const fecha = ch.when === 'tomorrow' ? manana : hoy;
-    for (const part of ch.text.split(/\s*[,;]\s*|\s+y\s+|\s*\.\s+/i)) {
-      const hm = part.match(HORA_RE);
+  // Frases separadas por "porque", "pero", "aunque": no comparten día
+  for (const run of raw.trim().split(HARD_SPLIT)) {
+    let runDay = null;
+
+    for (const part of run.split(SOFT_SPLIT)) {
+      const seg = part.trim();
+      if (!seg) continue;
+
+      const fe = parseFecha(seg);
+      const hm = seg.match(HORA_RE);
       const hora = hm ? parseHora(hm) : null;
-      const texto = cleanChunk(part.replace(HORA_RE, ' '));
+
+      let rest = seg;
+      if (fe) rest = rest.replace(fe.text, ' ');
+      if (hm) rest = rest.replace(hm[0], ' ');
+
+      const mk = readMarks(rest);
+      rest = mk.clean;
+
+      let fecha = null;
+      if (fe) fecha = fe.key;
+      else if (mk.when === 'today') fecha = hoy;
+      else if (mk.when === 'tomorrow') fecha = manana;
+
+      if (fecha) runDay = fecha;
+      else if (runDay) fecha = runDay;
+
+      if (!fecha && planifNoche && (mk.franja === 'tarde' || mk.franja === 'noche')) fecha = manana;
+      if (!fecha) fecha = hoy;
+
+      const texto = cleanChunk(rest);
       if (!texto) continue;
-      const franja = ch.period
-        || (hora !== null ? franjaOfTime(hora, f) : null)
-        || suggestPeriod(texto, fecha, created, f);
+
+      let franja = mk.franja || (hora !== null ? franjaOfTime(hora, f) : null);
+      if (!franja) franja = suggestPeriod(texto, fecha, created, f);
+
       created.push(buildTask(texto, franja || 'manana', fecha, hora));
     }
   }
@@ -750,6 +802,42 @@ function checkAvisos() {
 }
 
 /* ==========================================================
+   PRÓXIMAMENTE: tareas de los próximos días, en una tarjeta pequeña
+   ========================================================== */
+
+function renderProx() {
+  const wrap = $('#prox');
+  const hoy = todayKey();
+  const lim = dateKey(addDays(new Date(), PROX_DIAS));
+
+  const list = tasks
+    .filter(t => t.fecha > hoy && t.fecha <= lim && OPEN.includes(t.estado))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || ((a.hora_fija ?? 9999) - (b.hora_fija ?? 9999)));
+
+  if (!list.length) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+
+  const lineas = list.map(t => {
+    const fecha = keyToDate(t.fecha).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const hora = t.hora_fija !== null ? ` · ${fmt(t.hora_fija)}` : '';
+    return `
+      <li class="flex items-baseline justify-between gap-3 py-1.5">
+        <span class="shrink-0 text-[12px] capitalize text-muted">${esc(fecha)}${hora}</span>
+        <span class="text-right text-[14px] leading-snug">${esc(t.texto)}</span>
+      </li>`;
+  }).join('');
+
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = `
+    <div class="rounded-[1.25rem] bg-white/60 px-4 py-3 soft-shadow fade-in">
+      <button id="prox-toggle" class="flex w-full items-center justify-between text-left">
+        <span class="text-[13px] font-medium">Próximamente</span>
+        <span class="text-[12px] text-muted">${proxOpen ? 'ocultar' : 'ver'}</span>
+      </button>
+      ${proxOpen ? `<ul class="mt-2 divide-y divide-[#E6DFCD]">${lineas}</ul>` : ''}
+    </div>`;
+}
+
+/* ==========================================================
    RENDER DEL TABLERO
    ========================================================== */
 
@@ -824,9 +912,10 @@ function render() {
     ? `<button id="example" class="mx-auto block rounded-full border border-[#E6DFCD] bg-white/60 px-4 py-2 text-[13px] text-muted transition active:scale-95">Probá: "${esc(DEMO_PHRASES[0].slice(0, 42))}…"</button>`
     : '';
 
-  const board = $('#board');
-  board.innerHTML = cards + extrasHTML + vacio;
+  $('#board').innerHTML = cards + extrasHTML + vacio;
+  renderProx();
 
+  const board = $('#board');
   if (pendingFx) {
     const el = board.querySelector(`[data-tid="${pendingFx.id}"]`);
     if (el) el.classList.add(pendingFx.cls);
@@ -951,6 +1040,7 @@ function renderConfig() {
   errEl.classList.toggle('hidden', !err);
 
   $('#toggle-sonido').textContent = draft.avisos.sonido ? 'Sonido: activado' : 'Sonido: silencio';
+  $('#toggle-planif').textContent = draft.planificacion.tarde_noche_a_manana ? 'Activado' : 'Desactivado';
 }
 
 function openPicker(k, field) {
@@ -1039,6 +1129,7 @@ async function submitText(raw) {
     texto: text,
     tareas: created.length,
     franjas: created.map(t => t.franja),
+    fechas: created.map(t => t.fecha),
     con_hora: created.filter(t => t.hora_fija !== null).length
   });
 
@@ -1056,13 +1147,13 @@ async function submitText(raw) {
   const later = created.length - hoyList.length;
 
   if (!hoyList.length) {
-    toast('Listo, lo guardé para mañana.');
+    toast('Listo, lo guardé para más adelante.');
     return;
   }
 
   const usados = [...new Set(hoyList.map(t => META[t.franja].title.toLowerCase()))];
   const readable = usados.length > 1 ? usados.slice(0, -1).join(', ') + ' y ' + usados.slice(-1) : usados[0];
-  toast(`Listo, lo acomodé en ${readable}.` + (later ? ' Lo demás queda para mañana.' : ''));
+  toast(`Listo, lo acomodé en ${readable}.` + (later ? ' Lo demás queda para otro día.' : ''));
 }
 
 /* ---------- Dictado por voz ---------- */
@@ -1120,6 +1211,13 @@ document.addEventListener('click', (e) => {
 }, true);
 
 window.addEventListener('error', (e) => logEvent('error', { msg: e.message, linea: e.lineno }));
+
+$('#prox').addEventListener('click', (e) => {
+  if (e.target.closest('#prox-toggle')) {
+    proxOpen = !proxOpen;
+    renderProx();
+  }
+});
 
 $('#board').addEventListener('click', (e) => {
   const hecha = e.target.closest('[data-hecha]');
@@ -1265,6 +1363,12 @@ $('#toggle-sonido').addEventListener('click', () => {
   renderConfig();
 });
 
+$('#toggle-planif').addEventListener('click', () => {
+  draft.planificacion.tarde_noche_a_manana = !draft.planificacion.tarde_noche_a_manana;
+  logEvent('ajuste_planificacion', { valor: draft.planificacion.tarde_noche_a_manana });
+  renderConfig();
+});
+
 $('#config-reset').addEventListener('click', () => {
   draft = clone(DEFAULT_AJUSTES);
   renderConfig();
@@ -1275,7 +1379,7 @@ $('#config-save').addEventListener('click', () => {
   if (err) { renderConfig(); return; }
   aj = clone(draft);
   persistAjustes();
-  logEvent('ajustes_guardados', { franjas: aj.franjas, avisos: aj.avisos });
+  logEvent('ajustes_guardados', { franjas: aj.franjas, avisos: aj.avisos, planificacion: aj.planificacion });
   closeConfig();
   render();
   toast('Ajustes guardados.');
@@ -1327,4 +1431,4 @@ checkAvisos();
 setInterval(checkAvisos, 20000);
 </script>
 </body>
-  </html>
+</html>
